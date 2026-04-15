@@ -65,6 +65,8 @@ Important rules:
 
     const fullMessage = `${systemPrompt}\n\nConversation History:\n${message}`;
 
+    console.log("Sending request to Gemini API...");
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -87,15 +89,31 @@ Important rules:
       }
     );
 
-    const data = await response.json();
+    console.log("Gemini API Response Status:", response.status);
 
+    const data = await response.json();
+    console.log("Gemini API Response Data:", JSON.stringify(data, null, 2));
+
+    // Check for errors in the response
+    if (data.error) {
+      console.error("Gemini API Error:", data.error);
+      return res.status(500).json({ 
+        reply: `AI service error: ${data.error.message || 'Unknown error'}` 
+      });
+    }
+
+    // Extract the reply from the response
     const reply =
       data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No response from AI";
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "I'm sorry, I couldn't process that request. Please try again.";
+
+    console.log("Reply sent to client:", reply.substring(0, 100) + "...");
 
     res.json({ reply });
   } catch (error) {
-    console.error("Chat error:", error);
+    console.error("Chat error:", error.message);
+    console.error("Full error:", error);
     res.status(500).json({ reply: "Server error. Please try again later." });
   }
 });
