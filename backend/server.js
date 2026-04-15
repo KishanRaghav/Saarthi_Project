@@ -3,6 +3,7 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
 const connectDB = require("./config/db");
 const errorHandler = require("./Middleware/errorHandler");
 
@@ -77,10 +78,33 @@ app.get("/", (req, res) => {
   res.send("API is running 🚀");
 });
 
+// Health Check Route
+app.get("/api/health", async (req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = dbState === 1 ? 'Connected' : 'Disconnected';
+    
+    res.json({
+      status: 'OK',
+      database: dbStatus,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'Error',
+      database: 'Error checking status',
+      error: error.message
+    });
+  }
+});
+
 // Error Handler (must be after routes)
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5002;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT} 🚀`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Allowed Origins: ${allowedOrigins.join(', ')}`);
 });
