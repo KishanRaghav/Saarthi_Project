@@ -14,10 +14,9 @@ import { SparklesIcon } from '@heroicons/react/24/solid';
 import { useNavigate } from 'react-router-dom';
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
-// Paste your Gemini API key here OR set VITE_GEMINI_API_KEY in your .env file
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'YOUR_GEMINI_API_KEY_HERE';
-
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+// Use backend chat endpoint instead of calling Gemini directly
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://saarthi-project-1.onrender.com';
+const CHAT_URL = `${BACKEND_URL}/chat`;
 
 const SYSTEM_PROMPT = `You are Saarthi, a friendly and intelligent healthcare assistant for a medical appointment booking platform called Saarthi. Your role is to help patients with:
 
@@ -192,45 +191,36 @@ const Chatbot = () => {
     inputRef.current?.focus();
   }, []);
 
-  // ── Gemini API call with multi-turn history ──────────────────────────────
+  // ── Backend API call with multi-turn history ──────────────────────────────
   const callGemini = async (userText, history) => {
-    // Build conversation history in Gemini format
-    // Prepend the system prompt as the first user message + model ack
-    const contents = [
-      { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-      { role: 'model', parts: [{ text: 'Understood. I\'m Saarthi, ready to help patients with their healthcare needs.' }] },
+    // Build conversation history
+    const conversationHistory = [
+      { role: 'user', text: SYSTEM_PROMPT },
+      { role: 'bot', text: 'Understood. I\'m Saarthi, ready to help patients with their healthcare needs.' },
       // Previous messages
-      ...history.map((m) => ({
-        role: m.sender === 'user' ? 'user' : 'model',
-        parts: [{ text: m.text }],
-      })),
+      ...history,
       // Current message
-      { role: 'user', parts: [{ text: userText }] },
+      { role: 'user', text: userText },
     ];
 
-    const res = await fetch(GEMINI_URL, {
+    // Format the conversation into a single message for the backend
+    const fullMessage = conversationHistory.map(msg => 
+      `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.text}`
+    ).join('\n\n');
+
+    const res = await fetch(CHAT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 512,
-        },
-        safetySettings: [
-          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        ],
-      }),
+      body: JSON.stringify({ message: fullMessage }),
     });
 
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err?.error?.message || 'Gemini API error');
+      throw new Error(err?.reply || 'Backend chat API error');
     }
 
     const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I couldn\'t generate a response. Please try again.';
+    return data.reply || 'Sorry, I couldn\'t generate a response. Please try again.';
   };
 
   // ── Send message ─────────────────────────────────────────────────────────

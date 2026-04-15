@@ -42,6 +42,29 @@ app.post("/chat", async (req, res) => {
   try {
     const { message } = req.body;
 
+    if (!message) {
+      return res.status(400).json({ reply: "Message is required" });
+    }
+
+    // System prompt for Saarthi healthcare assistant
+    const systemPrompt = `You are Saarthi, a friendly and intelligent healthcare assistant for a medical appointment booking platform called Saarthi. Your role is to help patients with:
+
+1. Booking, cancelling, or rescheduling appointments
+2. Understanding which type of doctor/specialist to see based on their symptoms
+3. General health tips and wellness advice
+4. Navigating the Saarthi app (e.g., how to view appointments, update profile)
+5. Answering common medical FAQs
+
+Important rules:
+- Always be warm, empathetic, and easy to understand.
+- Never provide definitive diagnoses — always recommend consulting a qualified doctor.
+- If someone describes a medical emergency (chest pain, trouble breathing, severe bleeding, etc.), immediately tell them to call emergency services (102 in India) and stop the conversation there.
+- Keep responses concise (2-4 sentences for most replies, slightly longer if explaining a process).
+- If asked something outside healthcare or app navigation, politely redirect to what you can help with.
+- Use simple language — avoid heavy medical jargon unless the patient seems medically literate.`;
+
+    const fullMessage = `${systemPrompt}\n\nConversation History:\n${message}`;
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -53,9 +76,13 @@ app.post("/chat", async (req, res) => {
           contents: [
             {
               role: "user",
-              parts: [{ text: message }],
+              parts: [{ text: fullMessage }],
             },
           ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 512,
+          },
         }),
       }
     );
@@ -68,8 +95,8 @@ app.post("/chat", async (req, res) => {
 
     res.json({ reply });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ reply: "Server error" });
+    console.error("Chat error:", error);
+    res.status(500).json({ reply: "Server error. Please try again later." });
   }
 });
 
